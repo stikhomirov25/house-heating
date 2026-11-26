@@ -11,7 +11,7 @@ from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers.event import async_track_state_change_event, async_track_time_interval
 from homeassistant.helpers.storage import Store
 
-from .zones import Room, GROUPS, GROUP_NAMES, average, demands, outputs
+from .zones import Room, GROUPS, GROUP_NAMES, average, demands, outputs, HYSTERESIS_C
 
 _LOG = logging.getLogger(__name__)
 INVALID = {"unavailable", "unknown"}
@@ -20,6 +20,7 @@ FLOOR_TARGET_C = 33.0
 
 async def async_setup_entry(hass, entry, async_add_entities):
     control = Controller(hass, entry.data, entry.entry_id)
+    control.hysteresis = entry.options.get("hysteresis", HYSTERESIS_C)
     saved = await control.store.async_load() or {}
     control.targets.update(saved.get("targets", {}))
     control.pause_until = saved.get("pause_until", 0)
@@ -46,6 +47,7 @@ class Controller:
         self.hass = hass
         self.store = Store(hass, 1, f"house_heating.targets.{entry_id}")
         self.targets = dict.fromkeys(self.rooms, 19.0)
+        self.hysteresis = HYSTERESIS_C
         self.requests = dict.fromkeys(self.rooms, False)
         self.entities = []
         self.active = False
@@ -81,13 +83,13 @@ class Controller:
         return average(values)
 
     def heat(self):
-        return demands(self.targets, {k: self.reading(k) for k in self.rooms}, self.requests)
+        return demands(self.targets, {k: self.reading(k) for k in self.rooms}, self.requests, self.hysteresis)
 
     def update_requests(self):
         if not self.active:
             return
         readings = {k: self.reading(k) for k in self.rooms}
-        next_requests = demands(self.targets, readings, self.requests)
+        next_requests = demands(self.targets, readings, self.requests, self.hysteresis)
         # Missing sensors suppress output. Keep the last latch through startup
         # so a sensor returning inside the band resumes its previous cycle.
         for key, temperature in readings.items():
@@ -266,7 +268,7 @@ class Thermostat(ClimateEntity):
     def extra_state_attributes(self):
         until = self.control.pause_until
         return {"pause_until": datetime.fromtimestamp(until, timezone.utc).isoformat() if self.control.paused else None,
-                "control_active": self.control.active}
+                "control_active": self.control.active, "hysteresis": self.control.hysteresis}
 
     async def async_set_hvac_mode(self, hvac_mode):
         if hvac_mode != HVACMode.HEAT:

@@ -1,12 +1,14 @@
 from copy import deepcopy
 import json
+import math
 import re
 
 import voluptuous as vol
 from homeassistant import config_entries
+from homeassistant.core import callback
 from homeassistant.helpers import entity_registry as er, selector
 
-from .zones import SLOTS
+from .zones import SLOTS, HYSTERESIS_C
 
 
 def entities(domains, multiple=False):
@@ -17,6 +19,11 @@ def entities(domains, multiple=False):
 
 class HeatingFlow(config_entries.ConfigFlow, domain="house_heating"):
     VERSION = 1
+
+    @staticmethod
+    @callback
+    def async_get_options_flow(config_entry):
+        return HeatingOptionsFlow()
 
     def __init__(self):
         self.settings = {"rooms": {}}
@@ -165,3 +172,22 @@ class HeatingFlow(config_entries.ConfigFlow, domain="house_heating"):
         if self.edit_entry:
             return self.async_update_reload_and_abort(self.edit_entry, data_updates=self.settings)
         return self.async_create_entry(title="Климат дома", data=self.settings)
+
+
+class HeatingOptionsFlow(config_entries.OptionsFlow):
+    async def async_step_init(self, user_input=None):
+        errors = {}
+        if user_input is not None:
+            value = float(user_input["hysteresis"])
+            if math.isfinite(value) and 0 <= value <= 5:
+                return self.async_create_entry(title="", data={"hysteresis": value})
+            errors["base"] = "invalid_hysteresis"
+        current = self.config_entry.options.get("hysteresis", HYSTERESIS_C)
+        return self.async_show_form(
+            step_id="init", errors=errors,
+            data_schema=vol.Schema({
+                vol.Required("hysteresis", default=current): selector.NumberSelector(
+                    selector.NumberSelectorConfig(min=0, max=5, step=0.1, mode="box", unit_of_measurement="°C")
+                ),
+            }),
+        )

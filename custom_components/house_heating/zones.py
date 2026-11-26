@@ -28,13 +28,13 @@ def average(values):
 HYSTERESIS_C = 1.0
 
 
-def demands(targets, readings, previous):
-    """Start one degree below target; keep heating up to the target."""
+def demands(targets, readings, previous, hysteresis=HYSTERESIS_C):
+    """Start a hysteresis interval below target; keep heating up to the target."""
     result = {}
     for key, temperature in readings.items():
         target = targets[key]
-        result[key] = temperature is not None and (
-            temperature <= target - HYSTERESIS_C
+        result[key] = temperature is not None and temperature < target and (
+            temperature <= target - hysteresis
             or (previous.get(key, False) and temperature < target)
         )
     return result

@@ -49,5 +49,19 @@
       "already_configured": "Already configured",
       "reconfigure_successful": "Device mapping updated"
     }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Heating settings",
+        "description": "Shared room hysteresis. With target 26°C and hysteresis 1°C, heating starts at 25°C and stops at 26°C. The previous demand is retained between thresholds.",
+        "data": {
+          "hysteresis": "Hysteresis"
+        }
+      }
+    },
+    "error": {
+      "invalid_hysteresis": "Enter a value from 0 to 5°C."
+    }
   }
 }
