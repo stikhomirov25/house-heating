@@ -1,0 +1,67 @@
+type: vertical-stack
+cards:
+  - type: markdown
+    content: >
+      {% set e = 'climate.house_heating_home' %}
+      {% set p = state_attr(e, 'pause_until') %}
+      {% if p %}**Климат дома · пауза до {{ as_local(as_datetime(p)).strftime('%H:%M') }}**
+      {% elif not state_attr(e, 'control_active') %}**Для запуска задайте температуру всего дома.**
+      {% else %}**Климат дома**{% endif %}
+  - type: thermostat
+    entity: climate.house_heating_home
+  - type: grid
+    columns: 2
+    square: false
+    cards:
+      - type: tile
+        entity: climate.house_heating_floor1
+        features:
+          - type: target-temperature
+      - type: tile
+        entity: climate.house_heating_room_1
+        features:
+          - type: target-temperature
+      - type: tile
+        entity: climate.house_heating_room_2
+        features:
+          - type: target-temperature
+      - type: tile
+        entity: climate.house_heating_room_3
+        features:
+          - type: target-temperature
+      - type: tile
+        entity: climate.house_heating_room_4
+        features:
+          - type: target-temperature
+  - type: grid
+    columns: 2
+    square: false
+    cards:
+      - type: tile
+        entity: climate.house_heating_floor2
+        features:
+          - type: target-temperature
+      - type: tile
+        entity: climate.house_heating_room_5
+        features:
+          - type: target-temperature
+      - type: tile
+        entity: climate.house_heating_room_6
+        features:
+          - type: target-temperature
+      - type: tile
+        entity: climate.house_heating_room_7
+        features:
+          - type: target-temperature
+      - type: tile
+        entity: climate.house_heating_room_8
+        features:
+          - type: target-temperature
+      - type: tile
+        entity: climate.house_heating_room_9
+        features:
+          - type: target-temperature
+      - type: tile
+        entity: climate.house_heating_room_10
+        features:
+          - type: target-temperature
