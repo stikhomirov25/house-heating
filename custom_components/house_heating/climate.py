@@ -15,6 +15,7 @@ from .zones import Room, GROUPS, GROUP_NAMES, average, demands, outputs
 
 _LOG = logging.getLogger(__name__)
 INVALID = {"unavailable", "unknown"}
+FLOOR_TARGET_C = 33.0
 
 
 async def async_setup_entry(hass, entry, async_add_entities):
@@ -23,6 +24,8 @@ async def async_setup_entry(hass, entry, async_add_entities):
     control.targets.update(saved.get("targets", {}))
     control.pause_until = saved.get("pause_until", 0)
     control.active = saved.get("active", False) and saved.get("mapping") == control.mapping
+    if control.active:
+        control.requests.update({k: saved.get("requests", {}).get(k) is True for k in control.rooms})
     entities = [Thermostat(control, key) for key in GROUPS]
     control.entities = entities
     async_add_entities(entities)
@@ -43,6 +46,7 @@ class Controller:
         self.hass = hass
         self.store = Store(hass, 1, f"house_heating.targets.{entry_id}")
         self.targets = dict.fromkeys(self.rooms, 19.0)
+        self.requests = dict.fromkeys(self.rooms, False)
         self.entities = []
         self.active = False
         self.pause_until = 0
@@ -56,7 +60,7 @@ class Controller:
         return outputs(heat, self.rooms, self.floor, self.boiler)
 
     def snapshot(self):
-        return {"mapping": self.mapping, "targets": dict(self.targets), "pause_until": self.pause_until, "active": self.active}
+        return {"mapping": self.mapping, "requests": dict(self.requests), "targets": dict(self.targets), "pause_until": self.pause_until, "active": self.active}
 
     def save(self):
         self.store.async_delay_save(self.snapshot, 0)
@@ -77,7 +81,21 @@ class Controller:
         return average(values)
 
     def heat(self):
-        return demands(self.targets, {k: self.reading(k) for k in self.rooms})
+        return demands(self.targets, {k: self.reading(k) for k in self.rooms}, self.requests)
+
+    def update_requests(self):
+        if not self.active:
+            return
+        readings = {k: self.reading(k) for k in self.rooms}
+        next_requests = demands(self.targets, readings, self.requests)
+        # Missing sensors suppress output. Keep the last latch through startup
+        # so a sensor returning inside the band resumes its previous cycle.
+        for key, temperature in readings.items():
+            if temperature is None:
+                next_requests[key] = self.requests[key]
+        if self.requests != next_requests:
+            self.requests = next_requests
+            self.save()
 
     @property
     def paused(self):
@@ -107,6 +125,7 @@ class Controller:
         self.schedule()
 
     def refresh(self):
+        self.update_requests()
         for entity in self.entities:
             if entity.hass is not None and entity.entity_id and entity.ready:
                 entity.async_write_ha_state()
@@ -152,11 +171,24 @@ class Controller:
             modes = state.attributes.get("hvac_modes", ())
             radiator = key not in self.protected
             mode = "heat" if on or (radiator and "off" not in modes) else "off"
+            if on and not radiator and "heat" not in modes and "heat_cool" in modes:
+                mode = "heat_cool"
             if mode not in modes:
                 raise ValueError(f"Устройство не поддерживает режим {mode}")
+            floor_target = None
+            if on and not radiator:
+                # Climate service temperatures use Home Assistant's display unit.
+                floor_target = FLOOR_TARGET_C
+                if self.hass.config.units.temperature_unit == UnitOfTemperature.FAHRENHEIT:
+                    floor_target = round(FLOOR_TARGET_C * 9 / 5 + 32, 1)
+                if not state.attributes.get("min_temp", -math.inf) <= floor_target <= state.attributes.get("max_temp", math.inf):
+                    raise ValueError("33 °C вне допустимого диапазона уставок регулятора пола")
             if state.state != mode:
                 service = "set_hvac_mode"
                 data["hvac_mode"] = mode
+            elif floor_target is not None and state.attributes.get("temperature") != floor_target:
+                service = "set_temperature"
+                data["temperature"] = floor_target
             elif radiator and mode == "heat":
                 target = state.attributes.get("max_temp" if on else "min_temp")
                 if target is None:

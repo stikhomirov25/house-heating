@@ -25,8 +25,19 @@ def average(values):
     return round(mean(valid), 2) if valid else None
 
 
-def demands(targets, readings):
-    return {k: readings[k] is not None and readings[k] < targets[k] for k in SLOTS}
+HYSTERESIS_C = 1.0
+
+
+def demands(targets, readings, previous):
+    """Start one degree below target; keep heating up to the target."""
+    result = {}
+    for key, temperature in readings.items():
+        target = targets[key]
+        result[key] = temperature is not None and (
+            temperature <= target - HYSTERESIS_C
+            or (previous.get(key, False) and temperature < target)
+        )
+    return result
 
 
 def outputs(heat, rooms, floor, boiler):
