@@ -1,0 +1,53 @@
+{
+  "config": {
+    "step": {
+      "shared": {
+        "title": "Boiler and shared floor heating",
+        "data": {
+          "boiler": "Boiler heating relay",
+          "floor": "Shared first-floor heating"
+        }
+      },
+      "room": {
+        "title": "Room {number} of 10 · floor {floor}",
+        "description": "Choose air temperature sensors. Multiple readings are averaged.",
+        "data": {
+          "name": "Room name",
+          "sensors": "Room temperature sensors",
+          "radiators": "Radiators",
+          "floor_climate": "Individual floor heating"
+        }
+      },
+      "reconfigure": {
+        "title": "Change device mapping",
+        "data": {
+          "section": "Section"
+        }
+      },
+      "user": {
+        "title": "Heating setup",
+        "menu_options": {
+          "shared": "Select devices by room",
+          "import_map": "Paste device mapping (JSON)"
+        }
+      },
+      "import_map": {
+        "title": "Paste device mapping (JSON)",
+        "data": {
+          "mapping": "Device map contents"
+        }
+      }
+    },
+    "error": {
+      "duplicate": "This actuator is already assigned.",
+      "required_room": "Enter a name and at least one sensor.",
+      "no_heat": "Choose a radiator or individual floor heater.",
+      "recursive": "Choose a physical device.",
+      "invalid_map": "Check the JSON, room layout and entity IDs. Each actuator may only be assigned once."
+    },
+    "abort": {
+      "already_configured": "Already configured",
+      "reconfigure_successful": "Device mapping updated"
+    }
+  }
+}
