@@ -153,8 +153,14 @@ class Controller:
             # Stop the boiler before closing paths; open paths before starting it.
             order = list(desired) if desired[self.boiler] else [self.boiler, *(k for k in desired if k != self.boiler)]
             for key in order:
-                if self.paused or revision != self.revision:
-                    break
+                if self.paused or self.closed:
+                    return
+                if revision != self.revision:
+                    # Device acknowledgements can arrive during a blocking call.
+                    # Restart only if the required outputs actually changed.
+                    if desired != self.outputs(self.heat()):
+                        break
+                    revision = self.revision
                 try:
                     await self.apply(key, desired[key])
                 except (HomeAssistantError, ValueError, TypeError) as err:
